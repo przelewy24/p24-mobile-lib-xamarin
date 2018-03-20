@@ -12,64 +12,105 @@ Przykład implementacji biblioteki:
 
 ### Dodawanie biblioteki
 
-W Visual Studio należy dodać referencję (References -> Add References) do biblioteki P24Lib (plik P24Lib.dll)
+W Visual Studio, w projekcie głównym i iOS należy dodać referencję (References -> Add References) do biblioteki P24Lib (plik P24Lib.dll)
 
 ### Dodanie widoku TransferPage
 W celu poprawnego działania biblioteki należy utworzyć widok TransferPage, który w code behind zawierał będzie:
-```java
+```csharp
 public partial class TransferPage : ContentPage
 {
 	public TransferPage(TrnDirectParams transactionParams)
-	{
-		var content = TransferPageHelper.ContentForTrnDirect(transactionParams);
-		content.AddNavigating(WebView_Navigating);
-		Content = content;
-	}
+  {
+      var content = TransferPageHelper.ContentForTrnDirect(transactionParams);
+      content.AddNavigating(WebView_Navigating);
+      Content = content;
+  }
 
-	public TransferPage(TrnRequestParams transactionParams)
-	{
-		var content = TransferPageHelper.ContentForTrnRequest(transactionParams);
-		content.AddNavigating(WebView_Navigating);
-		Content = content;
-	}
+  public TransferPage(TrnRequestParams transactionParams)
+  {
+      var content = TransferPageHelper.ContentForTrnRequest(transactionParams);
+      content.AddNavigating(WebView_Navigating);
+      Content = content;
+  }
 
-	public TransferPage(ExpressParams transactionParams)
-	{
-		var content = TransferPageHelper.ContentForExpress(transactionParams);
-		content.AddNavigating(WebView_Navigating);
-		Content = content;
-	}
+  public TransferPage(ExpressParams transactionParams)
+  {
+      var content = TransferPageHelper.ContentForExpress(transactionParams);
+      content.AddNavigating(WebView_Navigating);
+      Content = content;
+  }
 
-	private void WebView_Navigating(object sender, WebNavigatingEventArgs e)
-	{
-		if (TransferPageHelper.IfTransactionFinished(e))
-		{
-			Navigation.PopAsync();
-		}
-	}
+  private void WebView_Navigating(object sender, WebNavigatingEventArgs e)
+  {
+      if (TransferPageHelper.IfTransactionFinished(e))
+      {
+          Navigation.PopAsync();
+      }
+  }
 
-	protected override bool OnBackButtonPressed()
-	{
-		if (TransferPageHelper.CanMoveToBankList())
-		{
-			var newContent = TransferPageHelper.GetContentForBack();
-			newContent.Navigating += WebView_Navigating;
-			Content = newContent;
-			return true;
-		}
-		else
-		{
-			return base.OnBackButtonPressed();
-		}
-	}
+  protected override bool OnBackButtonPressed()
+  {
+      if (TransferPageHelper.CanMoveToBankList())
+      {
+          DisposeWebView();
+          var newContent = TransferPageHelper.GetContentForBack();
+          newContent.AddNavigating(WebView_Navigating);
+          Content = newContent;
+          return true;
+      }
+      else
+      {
+          DisposeWebView();
+          Content = null;
+          return base.OnBackButtonPressed();
+      }
+  }
+
+  public void DisposeWebView() {
+      if (Content != null) {
+          (Content as WebViewWithProgress).DisposeWebView();
+      }
+  }
+
+  protected override void OnDisappearing() {
+      DisposeWebView();
+  }
 }
 ```
+
+
+### Dodanie renderera WebView w projekcie iOS
+W projekcie iOS należy dodatkowo stworzyć klasę WebViewRenderer:
+
+```csharp
+[assembly: ExportRenderer(typeof(P24Lib.P24WebView), typeof(WebViewRender))]
+namespace P24XamarinLib.iOS
+{
+    public class WebViewRender : WebViewRenderer
+    {
+
+        protected override void OnElementChanged(VisualElementChangedEventArgs e)
+        {
+            base.OnElementChanged(e);
+
+            var webView = e.NewElement as P24Lib.P24WebView;
+            if (webView != null)
+                webView.EvaluateJavascript = (js) =>
+                {
+                    return Task.FromResult(this.EvaluateJavascript(js));
+                };
+        }
+
+    }
+}
+```
+
 
 ## 2. Wywołanie transakcji trnDirect
 
 W tym celu należy stworzyć obiekt klasy TrnDirectParams i przy okazji ustawić parametry transakcji, podając Merchant Id i klucz do CRC:
 
-```java
+```csharp
 var payment = new TrnDirectParams()
             {
                 SessionId = XXXXXXXXXXXXX,
@@ -90,7 +131,7 @@ var payment = new TrnDirectParams()
 
 Parametry opcjonalne:
 
-```java
+```csharp
 payment.UrlStatus = "https://XXXXXX";
 payment.Method = 25;
 payment.TimeLimit = 90;
@@ -101,13 +142,13 @@ payment.Shipping = 0;
 
 Opcjonalne można ustawić wywołanie transakcji na serwer Sandbox:
 
-```java
+```csharp
 payment.SetSandbox(true)
 ```
 
 Mając gotowe obiekty konfiguracyjne możemy przystąpić do wywołania widoku dla transakcji. Uruchomienie wygląda następująco:
 
-```java
+```csharp
 var payment = GetTransferParams();
 var transferPage = new TransferPage(payment.SetSandbox(setSandbox));
 transferPage.Disappearing += (sender2, e2) => { TransferPageResult(); };
@@ -116,7 +157,7 @@ await Navigation.PushAsync(transferPage);
 
 Aby obsłużyć rezultat transakcji należy rozszerzyć metodę `TransferPageResult`:
 
-```java
+```csharp
 private void TransferPageResult()
 {
 	var result = Result.Get();
@@ -133,8 +174,13 @@ private void TransferPageResult()
 			var errorCode = result.ErrorCode;
 		}
 	}
+	else
+	{
+      //cancel
+  }
 }
 ```
+
 `TransferPage` zwraca tylko informację o tym, że transakcja się zakończyła. Nie zawsze oznacza to czy transakcja jest zweryfikowana przez serwer partnera, dlatego za każdym razem po uzyskaniu statusu `isSuccess` aplikacja powinna odpytać własny backend o status transakcji.
 
 ## 3. Wywołanie transakcji trnRequest
@@ -159,7 +205,7 @@ dana metoda płatności, należy ustawić ją w tym parametrze przy rejestracji
 
 Należy ustawić parametry transakcji podając token zarejestrowanej wcześniej transakcji, opcjonalnie można ustawić serwer sandbox oraz konfigurację banków:
 
-```java
+```csharp
 var token = "XXXX-XXXX-XXXX-XXXX"; // transaction token
 var transferPage = new TransferPage(new TrnRequestParams(token).SetSandbox(setSandbox));
 transferPage.Disappearing += (sender2, e2) => { TransferPageResult(); };
@@ -172,7 +218,7 @@ Rezultat transakcji należy obsłużyć identycznie jak dla wywołania "trnDirec
 
 Należy ustawić parametry transakcji podając url uzyskany podczas rejestracji transakcji w systemie Ekspres. Transakcja musi być zarejestrowana jako mobilna.
 
-```java
+```csharp
 var url = "https://XXX"; // url to express transaction
 var transferPage = new TransferPage(new ExpressParams(url));
 transferPage.Disappearing += (sender2, e2) => { TransferPageResult(); };
@@ -185,7 +231,7 @@ Rezultat transakcji należy obsłużyć identycznie jak dla wywołania "trnDirec
 
 Należy ustawić parametry transakcji identycznie jak dla wywołania "trnDirect", dodając odpowiednio przygotowany obiekt koszyka:
 
-```java
+```csharp
 payment.PassageCart = new PassageCart();
 
 var item = new PassageItem()
