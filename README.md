@@ -87,34 +87,32 @@ namespace P24XamarinLib.iOS
     public class WebViewRender : WebViewRenderer
     {
 
-				protected override void OnElementChanged(VisualElementChangedEventArgs e)
-				{
-						base.OnElementChanged(e);
+        protected override void OnElementChanged(VisualElementChangedEventArgs e)
+        {
+            base.OnElementChanged(e);
 
-						var webView = e.NewElement as P24WebView;
-						if (webView != null)
-						{
-								webView.EvaluateJavascript = (js) =>
-								{
-										return Task.FromResult(this.EvaluateJavascript(js));
-								};
+            var webView = e.NewElement as P24WebView;
+            if (webView != null)
+            {
+                webView.EvaluateJavascript = (js) =>
+                {
+                    return Task.FromResult(this.EvaluateJavascript(js));
+                };
 
-								initRefreshCommand(webView);            
-						}
+                initRefreshCommand(webView);            
+            }
+        }
 
+        private void initRefreshCommand(P24WebView webView) {
+            if (NativeView != null)
+            {
+                webView.reloadAction = () =>
+                {
+                    ((UIWebView)NativeView).Reload();
+                };
+            }
 
-				}
-
-				private void initRefreshCommand(P24WebView webView) {
-						if (NativeView != null)
-						{
-								webView.reloadAction = () =>
-								{
-										((UIWebView)NativeView).Reload();
-								};
-						}
-
-				}
+        }
 
     }
 }
