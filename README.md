@@ -19,62 +19,60 @@ W celu poprawnego działania biblioteki należy utworzyć widok TransferPage, kt
 ```csharp
 public partial class TransferPage : ContentPage
 {
-	public TransferPage(TrnDirectParams transactionParams)
-  {
-      var content = TransferPageHelper.ContentForTrnDirect(transactionParams);
-      content.AddNavigating(WebView_Navigating);
-      Content = content;
-  }
 
-  public TransferPage(TrnRequestParams transactionParams)
-  {
-      var content = TransferPageHelper.ContentForTrnRequest(transactionParams);
-      content.AddNavigating(WebView_Navigating);
-      Content = content;
-  }
+    public TransferPage(TrnDirectParams transactionParams)
+    {
+        var content = TransferPageHelper.ContentForTrnDirect(transactionParams, WebView_Navigating);
+        Content = content;
+    }
 
-  public TransferPage(ExpressParams transactionParams)
-  {
-      var content = TransferPageHelper.ContentForExpress(transactionParams);
-      content.AddNavigating(WebView_Navigating);
-      Content = content;
-  }
+    public TransferPage(TrnRequestParams transactionParams)
+    {
+        var content = TransferPageHelper.ContentForTrnRequest(transactionParams, WebView_Navigating);
+        Content = content;
+    }
 
-  private void WebView_Navigating(object sender, WebNavigatingEventArgs e)
-  {
-      if (TransferPageHelper.IfTransactionFinished(e))
-      {
-          Navigation.PopAsync();
-      }
-  }
+    public TransferPage(ExpressParams transactionParams)
+    {
+        var content = TransferPageHelper.ContentForExpress(transactionParams, WebView_Navigating);
+        Content = content;
+    }
 
-  protected override bool OnBackButtonPressed()
-  {
-      if (TransferPageHelper.CanMoveToBankList())
-      {
-          DisposeWebView();
-          var newContent = TransferPageHelper.GetContentForBack();
-          newContent.AddNavigating(WebView_Navigating);
-          Content = newContent;
-          return true;
-      }
-      else
-      {
-          DisposeWebView();
-          Content = null;
-          return base.OnBackButtonPressed();
-      }
-  }
+    private void WebView_Navigating(object sender, WebNavigatingEventArgs e)
+    {
+        if (TransferPageHelper.IfTransactionFinished(e))
+        {
+            Navigation.PopAsync();
+        }
+    }
 
-  public void DisposeWebView() {
-      if (Content != null) {
-          (Content as WebViewWithProgress).DisposeWebView();
-      }
-  }
+    protected override bool OnBackButtonPressed()
+    {
+        if (TransferPageHelper.CanMoveToBankList())
+        {
+            DisposeWebView();
+            var newContent = TransferPageHelper.GetContentForBack(WebView_Navigating);
+            Content = newContent;
+            return true;
+        }
+        else
+        {
+            DisposeWebView();
+            Content = null;
+            return base.OnBackButtonPressed();
+        }
+    }
 
-  protected override void OnDisappearing() {
-      DisposeWebView();
-  }
+    public void DisposeWebView() {
+        if (Content != null) {
+            (Content as WebViewWithProgress).DisposeWebView();
+        }
+    }
+
+    protected override void OnDisappearing() {
+        DisposeWebView();
+    }
+
 }
 ```
 
@@ -89,22 +87,69 @@ namespace P24XamarinLib.iOS
     public class WebViewRender : WebViewRenderer
     {
 
-        protected override void OnElementChanged(VisualElementChangedEventArgs e)
-        {
-            base.OnElementChanged(e);
+				protected override void OnElementChanged(VisualElementChangedEventArgs e)
+				{
+						base.OnElementChanged(e);
 
-            var webView = e.NewElement as P24Lib.P24WebView;
-            if (webView != null)
-                webView.EvaluateJavascript = (js) =>
-                {
-                    return Task.FromResult(this.EvaluateJavascript(js));
-                };
-        }
+						var webView = e.NewElement as P24WebView;
+						if (webView != null)
+						{
+								webView.EvaluateJavascript = (js) =>
+								{
+										return Task.FromResult(this.EvaluateJavascript(js));
+								};
+
+								initRefreshCommand(webView);            
+						}
+
+
+				}
+
+				private void initRefreshCommand(P24WebView webView) {
+						if (NativeView != null)
+						{
+								webView.reloadAction = () =>
+								{
+										((UIWebView)NativeView).Reload();
+								};
+						}
+
+				}
 
     }
 }
 ```
 
+### Dodanie renderera WebView w projekcie Android
+W projekcie Android należy dodatkowo stworzyć klasę WebViewRenderer:
+
+```csharp
+[assembly: ExportRenderer(typeof(P24WebView), typeof(WebViewRender))]
+namespace P24XamarinLib.Droid
+{
+    public class WebViewRender : WebViewRenderer
+    {
+        protected override void OnElementChanged(ElementChangedEventArgs<Xamarin.Forms.WebView> e)
+        {
+            base.OnElementChanged(e);
+
+            if (Control != null && e.NewElement != null)
+            {
+                InitializeCommands((P24WebView)e.NewElement);
+            }
+        }
+
+        private void InitializeCommands(P24WebView element)
+        {
+            element.reloadAction = () =>
+            {
+                Control?.Reload();
+            };
+
+        }
+    }
+}
+```
 
 ## 2. Wywołanie transakcji trnDirect
 
