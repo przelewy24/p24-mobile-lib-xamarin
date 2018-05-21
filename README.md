@@ -17,61 +17,57 @@ W Visual Studio, w projekcie głównym i iOS należy dodać referencję (Referen
 ### Dodanie widoku TransferPage
 W celu poprawnego działania biblioteki należy utworzyć widok TransferPage, który w code behind zawierał będzie:
 ```csharp
-public partial class TransferPage : ContentPage
-{
-
-    public TransferPage(TrnDirectParams transactionParams)
-    {
-        var content = TransferPageHelper.ContentForTrnDirect(transactionParams, WebView_Navigating);
-        Content = content;
-    }
-
-    public TransferPage(TrnRequestParams transactionParams)
-    {
-        var content = TransferPageHelper.ContentForTrnRequest(transactionParams, WebView_Navigating);
-        Content = content;
-    }
-
-    public TransferPage(ExpressParams transactionParams)
-    {
-        var content = TransferPageHelper.ContentForExpress(transactionParams, WebView_Navigating);
-        Content = content;
-    }
-
-    private void WebView_Navigating(object sender, WebNavigatingEventArgs e)
-    {
-        if (TransferPageHelper.IfTransactionFinished(e))
+public TransferPage(TrnDirectParams transactionParams)
         {
-            Navigation.PopAsync();
+            var content = TransferPageHelper.ContentForTrnDirect(transactionParams);
+            Content = content;
         }
-    }
 
-    protected override bool OnBackButtonPressed()
-    {
-        if (TransferPageHelper.CanMoveToBankList())
+        public TransferPage(TrnRequestParams transactionParams)
         {
+            var content = TransferPageHelper.ContentForTrnRequest(transactionParams);
+            Content = content;
+        }
+
+        public TransferPage(ExpressParams transactionParams)
+        {
+            var content = TransferPageHelper.ContentForExpress(transactionParams);
+            Content = content;
+        }
+
+        protected override bool OnBackButtonPressed()
+        {
+            if (TransferPageHelper.CanMoveToBankList())
+            {
+                DisposeWebView();
+                var newContent = TransferPageHelper.GetContentForBack();
+                Content = newContent;
+                return true;
+            }
+            else
+            {
+                DisposeWebView();
+                Content = null;
+                BanksUrl.Clear();
+                Navigation.PopAsync();
+                return true;
+            }
+        }
+
+        public void DisposeWebView() {
+            if (Content != null) {
+                (Content as WebViewWithProgress).DisposeWebView();
+            }
+        }
+
+        protected override void OnDisappearing() {
             DisposeWebView();
-            var newContent = TransferPageHelper.GetContentForBack(WebView_Navigating);
-            Content = newContent;
-            return true;
         }
-        else
+
+        public void CustomBackButtonAction()
         {
-            DisposeWebView();
-            Content = null;
-            return base.OnBackButtonPressed();
+            OnBackButtonPressed();
         }
-    }
-
-    public void DisposeWebView() {
-        if (Content != null) {
-            (Content as WebViewWithProgress).DisposeWebView();
-        }
-    }
-
-    protected override void OnDisappearing() {
-        DisposeWebView();
-    }
 
 }
 ```
@@ -81,7 +77,7 @@ public partial class TransferPage : ContentPage
 W projekcie iOS należy dodatkowo stworzyć klasę WebViewRenderer:
 
 ```csharp
-[assembly: ExportRenderer(typeof(P24Lib.P24WebView), typeof(WebViewRender))]
+[assembly: ExportRenderer(typeof(P24WebView), typeof(WebViewRender))]
 namespace P24XamarinLib.iOS
 {
     public class WebViewRender : WebViewRenderer
@@ -99,21 +95,96 @@ namespace P24XamarinLib.iOS
                     return Task.FromResult(this.EvaluateJavascript(js));
                 };
 
-                initRefreshCommand(webView);            
+                initRefreshCommand(webView);
             }
+
+
         }
 
-        private void initRefreshCommand(P24WebView webView) {
+
+        private void initRefreshCommand(P24WebView p24WebView)
+        {
             if (NativeView != null)
             {
-                webView.reloadAction = () =>
+                var uiWebView = (UIWebView)NativeView;
+                p24WebView.reloadAction = () =>
                 {
-                    ((UIWebView)NativeView).Reload();
+                    uiWebView.Reload();
                 };
+
             }
 
         }
 
+    }
+
+}
+
+```
+
+### Dodanie renderera TransferPage w projekcie iOS
+
+W projekcie iOS należy stworzyć klasę TransferPageRenderer:
+
+```csharp
+[assembly: ExportRenderer(typeof(TransferPage), typeof(TransferPageRenderer))]
+namespace P24XamarinLib.iOS
+{
+    public class TransferPageRenderer : PageRenderer
+    {
+        public override void ViewWillAppear(bool animated)
+        {
+            base.ViewWillAppear(animated);
+
+            SetCustomBackButton();
+        }
+
+        private void SetCustomBackButton()
+        {
+            var backBtnImage = UIImage.FromBundle("backButton.png");
+
+            backBtnImage =
+                backBtnImage.ImageWithRenderingMode(UIImageRenderingMode.AlwaysTemplate);
+
+            var backBtn = new UIButton(UIButtonType.Custom)
+            {
+                HorizontalAlignment = UIControlContentHorizontalAlignment.Left,
+                TitleEdgeInsets = new UIEdgeInsets(11.5f, 15f, 10f, 0f),
+                ImageEdgeInsets = new UIEdgeInsets(1f, 8f, 0f, 0f)
+            };
+
+            backBtn.SetTitle("Cofnij", UIControlState.Normal);
+            backBtn.SetTitleColor(UIColor.White, UIControlState.Normal);
+            backBtn.SetTitleColor(UIColor.LightGray, UIControlState.Highlighted);
+            backBtn.Font = UIFont.FromName("HelveticaNeue", (nfloat)17);
+
+            backBtn.SetImage(backBtnImage, UIControlState.Normal);
+
+            backBtn.SizeToFit();
+
+            backBtn.TouchDown += (sender, e) =>
+            {
+                ((TransferPage)Element)?.CustomBackButtonAction();
+            };
+
+            //Set the frame of the button
+            backBtn.Frame = new CGRect(
+                0,
+                0,
+                UIScreen.MainScreen.Bounds.Width / 4,
+                NavigationController.NavigationBar.Frame.Height);
+
+            var btnContainer = new UIView(
+                new CGRect(0, 0, backBtn.Frame.Width, backBtn.Frame.Height));
+            btnContainer.AddSubview(backBtn);
+
+            var backButtonItem = new UIBarButtonItem("", UIBarButtonItemStyle.Plain, null)
+            {
+                CustomView = backBtn
+            };
+
+            NavigationController.TopViewController.NavigationItem.LeftBarButtonItems = new[] { backButtonItem };
+        }
     }
 }
 ```
@@ -127,6 +198,9 @@ namespace P24XamarinLib.Droid
 {
     public class WebViewRender : WebViewRenderer
     {
+
+        private P24WebViewClient webViewClient;
+
         protected override void OnElementChanged(ElementChangedEventArgs<Xamarin.Forms.WebView> e)
         {
             base.OnElementChanged(e);
@@ -144,8 +218,39 @@ namespace P24XamarinLib.Droid
                 Control?.Reload();
             };
 
+            webViewClient = new P24WebViewClient(element);
+            Control?.SetWebViewClient(webViewClient);
         }
     }
+
+    public class P24WebViewClient: WebViewClient {
+
+        private P24WebView p24WebView;
+
+        public P24WebViewClient(P24WebView webView) {
+            p24WebView = webView;
+        }
+
+        public override void OnPageStarted(Android.Webkit.WebView view, string url, Bitmap favicon)
+        {
+            p24WebView.OnNavigating(url.ToString());
+            base.OnPageStarted(view, url, favicon);
+        }
+
+        public override void OnPageFinished(Android.Webkit.WebView view, string url)
+        {
+            p24WebView.OnNavigated(url.ToString());
+            base.OnPageFinished(view, url);
+        }
+
+        public override void OnReceivedError(Android.Webkit.WebView view, [GeneratedEnum] ClientError errorCode, string description, string failingUrl)
+        {
+            p24WebView.OnError(view.Url.ToString());
+            base.OnReceivedError(view, errorCode, description, failingUrl);
+        }
+
+    }
+
 }
 ```
 
