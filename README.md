@@ -189,6 +189,10 @@ namespace P24XamarinLib.iOS
 }
 ```
 
+### Dodanie zasbów projekcie iOS
+Dodać grafikę backButton@2x.png do katalogu Resources.
+
+
 ### Dodanie renderera WebView w projekcie Android
 W projekcie Android należy dodatkowo stworzyć klasę WebViewRenderer:
 
@@ -251,6 +255,20 @@ namespace P24XamarinLib.Droid
 
     }
 
+}
+```
+
+### Dodanie obsługi Back w projekcie Android
+W klasie MainActivity projektu Andorid przeładować metodę:
+
+```csharp
+public override bool OnOptionsItemSelected(IMenuItem item)
+{
+    if (item.ItemId == Android.Resource.Id.Home) {
+        OnBackPressed();
+        return true;
+    }
+    return base.OnOptionsItemSelected(item);
 }
 ```
 
