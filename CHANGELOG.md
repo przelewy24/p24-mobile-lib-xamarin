@@ -1,3 +1,7 @@
+Version 3.0.5
+
+- small fix
+
 Version 3.0.4
 
 - bug fixes

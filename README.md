@@ -215,16 +215,23 @@ namespace P24XamarinLib.Droid
             }
         }
 
-        private void InitializeCommands(P24WebView element)
+        private void InitializeCommands(P24WebView p24WebView)
         {
-            element.reloadAction = () =>
+            p24WebView.reloadAction = () =>
             {
                 Control?.Reload();
             };
 
-            webViewClient = new P24WebViewClient(element);
+            webViewClient = new P24WebViewClient(p24WebView);
             Control?.SetWebViewClient(webViewClient);
+            p24WebView.OnDisposed += P24WebView_OnDisposed;
         }
+
+        void P24WebView_OnDisposed(object sender, EventArgs e)
+        {
+            Control?.SetWebViewClient(null);
+        }
+
     }
 
     public class P24WebViewClient: WebViewClient {
