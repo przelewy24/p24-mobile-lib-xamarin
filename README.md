@@ -149,8 +149,8 @@ namespace P24XamarinLib.iOS
             var backBtn = new UIButton(UIButtonType.Custom)
             {
                 HorizontalAlignment = UIControlContentHorizontalAlignment.Left,
-                TitleEdgeInsets = new UIEdgeInsets(11.5f, 7f, 10f, 0f),
-                ImageEdgeInsets = new UIEdgeInsets(1f, 0f, 0f, 0f)
+                TitleEdgeInsets = new UIEdgeInsets(11.5f, 0f, 10f, 0f),
+                ImageEdgeInsets = new UIEdgeInsets(1f, -9f, 0f, 0f)
             };
 
             backBtn.SetTitle("Cofnij", UIControlState.Normal);
